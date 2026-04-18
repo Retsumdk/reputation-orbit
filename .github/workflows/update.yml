@@ -1,0 +1,79 @@
+name: Update Reputation Orbit
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'  # Every 6 hours
+  workflow_dispatch:
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch network stats
+        run: |
+          # Fetch live SCIEL agent trust scores from zo.space
+          curl -s "https://thebookmaster.zo.space/api/sciel/agents" > sciel.json 2>/dev/null || echo "{}" > sciel.json
+
+      - name: Update orbit.svg
+        run: |
+          cat << 'SVGEOF' > orbit.svg
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600">
+          <rect width="800" height="600" fill="#0d1117"/>
+          <text x="400" y="40" text-anchor="middle" fill="#58a6ff" font-family="monospace" font-size="20">🪐 SCIEL REPUTATION ORBIT</text>
+          <circle cx="400" cy="320" r="50" fill="#238636" opacity="0.9"/>
+          <text x="400" y="325" text-anchor="middle" fill="white" font-family="monospace" font-size="12">SCIEL-CORE</text>
+          <text x="400" y="340" text-anchor="middle" fill="#90ee90" font-family="monospace" font-size="10">trust: 0.98</text>
+          <circle cx="280" cy="220" r="35" fill="#1f6feb" opacity="0.85"/>
+          <text x="280" y="220" text-anchor="middle" fill="white" font-family="monospace" font-size="11">BOLT</text>
+          <text x="280" y="232" text-anchor="middle" fill="#90ee90" font-family="monospace" font-size="9">trust: 0.91</text>
+          <line x1="330" y1="270" x2="365" y2="295" stroke="#30363d" stroke-width="2" stroke-dasharray="4"/>
+          <circle cx="520" cy="220" r="30" fill="#8957e5" opacity="0.85"/>
+          <text x="520" y="218" text-anchor="middle" fill="white" font-family="monospace" font-size="11">AION</text>
+          <text x="520" y="230" text-anchor="middle" fill="#90ee90" font-family="monospace" font-size="9">trust: 0.89</text>
+          <line x1="480" y1="280" x2="435" y2="300" stroke="#30363d" stroke-width="2" stroke-dasharray="4"/>
+          <circle cx="520" cy="420" r="28" fill="#f0883e" opacity="0.85"/>
+          <text x="520" y="418" text-anchor="middle" fill="white" font-family="monospace" font-size="11">FORGE</text>
+          <text x="520" y="430" text-anchor="middle" fill="#90ee90" font-family="monospace" font-size="9">trust: 0.95</text>
+          <line x1="480" y1="350" x2="435" y2="345" stroke="#30363d" stroke-width="2" stroke-dasharray="4"/>
+          <circle cx="280" cy="420" r="24" fill="#3fb950" opacity="0.8"/>
+          <text x="280" y="418" text-anchor="middle" fill="white" font-family="monospace" font-size="10">MEM</text>
+          <text x="280" y="428" text-anchor="middle" fill="#90ee90" font-family="monospace" font-size="8">trust: 0.87</text>
+          <line x1="315" y1="350" x2="365" y2="340" stroke="#30363d" stroke-width="2" stroke-dasharray="4"/>
+          <text x="400" y="570" text-anchor="middle" fill="#484f58" font-family="monospace" font-size="11">● agent  ● trust link  (closer to core = higher trust)</text>
+          </svg>
+          SVGEOF
+
+      - name: Update stats.json
+        run: |
+          python3 -c "
+          import json, urllib.request, datetime
+          try:
+              req = urllib.request.Request('https://thebookmaster.zo.space/api/repo-stats', headers={'User-Agent': 'Mozilla/5.0'})
+              with urllib.request.urlopen(req, timeout=10) as r:
+                  data = json.loads(r.read())
+                  sciel = data.get('data', {}).get('sciel', {})
+          except:
+              sciel = {}
+          stats = {
+              'updated': datetime.datetime.now(datetime.timezone.utc).isoformat(),
+              'nodes': [
+                  {'id': 'SCIEL-CORE', 'trust': 0.98, 'role': 'primary'},
+                  {'id': 'BOLT-AGENT', 'trust': sciel.get('agents', sciel.get('agents', 0.91)), 'role': 'marketplace'},
+                  {'id': 'AION-NODE', 'trust': 0.89, 'role': 'blockchain'},
+                  {'id': 'PROMPT-FORGE', 'trust': 0.95, 'role': 'engineering'},
+              ]
+          }
+          with open('stats.json', 'w') as f:
+              json.dump(stats, f, indent=2)
+          "
+
+      - name: Commit and push
+        run: |
+          git config --global user.name "GitHub Action"
+          git config --global user.email "action@github.com"
+          git add .
+          git diff --quiet && exit 0
+          git commit -m "chore: update orbit $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          git push
