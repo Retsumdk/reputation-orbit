@@ -2,7 +2,7 @@ name: Update Reputation Orbit
 
 on:
   schedule:
-    - cron: '0 */6 * * *'  # Every 6 hours
+    - cron: '0 */6 * * *'
   workflow_dispatch:
 
 jobs:
@@ -13,7 +13,6 @@ jobs:
 
       - name: Fetch network stats
         run: |
-          # Fetch live SCIEL agent trust scores from zo.space
           curl -s "https://thebookmaster.zo.space/api/sciel/agents" > sciel.json 2>/dev/null || echo "{}" > sciel.json
 
       - name: Update orbit.svg
